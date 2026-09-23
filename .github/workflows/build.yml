@@ -15,18 +15,34 @@ jobs:
       - name: Verify Microsoft-signed driver payload
         shell: pwsh
         run: |
-          $driverFiles = @(Get-ChildItem driver -File | Where-Object {
-            $_.Extension -in @('.cat', '.inf', '.sys')
-          })
+          $ErrorActionPreference = 'Stop'
+          $catalog = (Resolve-Path 'driver/modernwakeup.driver.cat').Path
+          $driverFiles = @(
+            (Resolve-Path 'driver/ModernWakeup.Driver.inf').Path
+            (Resolve-Path 'driver/ModernWakeup.Driver.sys').Path
+          )
 
-          if ($driverFiles.Count -ne 3) {
-            throw "Expected the signed CAT, INF, and SYS files; found $($driverFiles.Count)."
+          $signature = Get-AuthenticodeSignature -LiteralPath $catalog
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Windows Hardware Compatibility Publisher') {
+            throw "Invalid Hardware Dashboard catalog signature ($($signature.Status): $($signature.StatusMessage))"
+          }
+
+          $signTool = Get-ChildItem -Path "${env:ProgramFiles(x86)}/Windows Kits/10/bin/*/x64/signtool.exe" -File |
+            Sort-Object { [version]$_.Directory.Parent.Name } -Descending |
+            Select-Object -First 1
+          if ($null -eq $signTool) {
+            throw 'SignTool was not found in the Windows SDK.'
+          }
+
+          & $signTool.FullName verify /q /kp $catalog
+          if ($LASTEXITCODE -ne 0) {
+            throw "The catalog failed kernel-policy verification (SignTool exit code $LASTEXITCODE)."
           }
 
           $driverFiles | ForEach-Object {
-            $signature = Get-AuthenticodeSignature -LiteralPath $_.FullName
-            if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Windows Hardware Compatibility Publisher') {
-              throw "Invalid Hardware Dashboard signature: $($_.Name) ($($signature.Status): $($signature.StatusMessage))"
+            & $signTool.FullName verify /q /kp /c $catalog $_
+            if ($LASTEXITCODE -ne 0) {
+              throw "The driver catalog does not validate $([IO.Path]::GetFileName($_)) (SignTool exit code $LASTEXITCODE)."
             }
           }
       - run: dotnet build ModernWakeup.sln -c Release -m:1
