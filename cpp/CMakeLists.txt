@@ -17,4 +17,4 @@ add_executable(modernwakeup_example example/modern_wakeup_example.cpp)
 target_link_libraries(modernwakeup_example PRIVATE modernwakeup)
 
 install(TARGETS modernwakeup EXPORT modernwakeup_targets)
-install(FILES include/modernwakeup.hpp include/modernwakeup_abi.h DESTINATION include)
+install(FILES include/modern_wakeup.hpp include/modern_wakeup_abi.h DESTINATION include)

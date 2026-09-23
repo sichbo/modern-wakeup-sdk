@@ -1,0 +1,158 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Read version from tag
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_NAME -notmatch '^v(?<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$') {
+            throw "Release tags must use SemVer syntax such as v0.13.0 or v0.14.0-beta.1; got '$env:GITHUB_REF_NAME'."
+          }
+
+          "RELEASE_VERSION=$($Matches.version)" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RELEASE_PRERELEASE=$($Matches.version.Contains('-').ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Verify Microsoft-signed driver payload
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $catalog = (Resolve-Path 'driver/modernwakeup.driver.cat').Path
+          $driverFiles = @(
+            (Resolve-Path 'driver/ModernWakeup.Driver.inf').Path
+            (Resolve-Path 'driver/ModernWakeup.Driver.sys').Path
+          )
+
+          $signature = Get-AuthenticodeSignature -LiteralPath $catalog
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Windows Hardware Compatibility Publisher') {
+            throw "Invalid Hardware Dashboard catalog signature ($($signature.Status): $($signature.StatusMessage))"
+          }
+
+          $signTool = Get-ChildItem -Path "${env:ProgramFiles(x86)}/Windows Kits/10/bin/*/x64/signtool.exe" -File |
+            Sort-Object { [version]$_.Directory.Parent.Name } -Descending |
+            Select-Object -First 1
+          if ($null -eq $signTool) {
+            throw 'SignTool was not found in the Windows SDK.'
+          }
+
+          & $signTool.FullName verify /q /kp $catalog
+          if ($LASTEXITCODE -ne 0) {
+            throw "The catalog failed kernel-policy verification (SignTool exit code $LASTEXITCODE)."
+          }
+
+          $driverFiles | ForEach-Object {
+            & $signTool.FullName verify /q /kp /c $catalog $_
+            if ($LASTEXITCODE -ne 0) {
+              throw "The driver catalog does not validate $([IO.Path]::GetFileName($_)) (SignTool exit code $LASTEXITCODE)."
+            }
+          }
+
+      - name: Build managed SDK and NuGet package
+        shell: pwsh
+        run: |
+          dotnet restore ModernWakeup.sln
+          if ($LASTEXITCODE -ne 0) { throw 'dotnet restore failed.' }
+
+          dotnet build ModernWakeup.sln -c Release --no-restore -m:1 -p:Version=$env:RELEASE_VERSION
+          if ($LASTEXITCODE -ne 0) { throw 'dotnet build failed.' }
+
+          dotnet pack csharp/ModernWakeup/ModernWakeup.csproj -c Release --no-build -o artifacts -p:PackageVersion=$env:RELEASE_VERSION
+          if ($LASTEXITCODE -ne 0) { throw 'dotnet pack failed.' }
+
+      - name: Build native SDK
+        shell: pwsh
+        run: |
+          cmake -S cpp -B out/cpp -A x64
+          if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed.' }
+
+          cmake --build out/cpp --config Release --parallel
+          if ($LASTEXITCODE -ne 0) { throw 'CMake build failed.' }
+
+          cmake --install out/cpp --config Release --prefix out/native
+          if ($LASTEXITCODE -ne 0) { throw 'CMake install failed.' }
+
+      - name: Assemble release assets
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stage = Join-Path $PWD "out/release/modern-wakeup-sdk-$env:RELEASE_VERSION"
+          New-Item -ItemType Directory -Path $stage, "$stage/bin" -Force | Out-Null
+
+          Copy-Item -Path 'out/native/*' -Destination $stage -Recurse
+          Copy-Item -LiteralPath 'out/cpp/Release/modernwakeup_example.exe' -Destination "$stage/bin/"
+          Copy-Item -LiteralPath 'driver' -Destination "$stage/driver" -Recurse
+          Copy-Item -LiteralPath 'docs' -Destination "$stage/docs" -Recurse
+          Copy-Item -LiteralPath 'README.md', 'LICENSE', 'DRIVER-LICENSE.md', 'PACKAGE-LICENSE.md' -Destination $stage
+
+          $archive = "artifacts/modern-wakeup-sdk-$env:RELEASE_VERSION-win-x64.zip"
+          Compress-Archive -Path "$stage/*" -DestinationPath $archive -CompressionLevel Optimal
+
+          $assets = @(Get-ChildItem artifacts -File | Where-Object { $_.Extension -in @('.nupkg', '.zip') })
+          $checksums = $assets | ForEach-Object {
+            $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)"
+          }
+          $checksums | Set-Content -LiteralPath 'artifacts/SHA256SUMS.txt' -Encoding ascii
+
+      - name: NuGet login with Trusted Publishing
+        uses: NuGet/login@v1
+        id: nuget_login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Publish NuGet package
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:NUGET_API_KEY)) {
+            throw 'NuGet Trusted Publishing did not issue a temporary API key.'
+          }
+
+          $packages = @(Get-ChildItem artifacts -Filter '*.nupkg' -File)
+          if ($packages.Count -ne 1) {
+            throw "Expected one NuGet package; found $($packages.Count)."
+          }
+
+          dotnet nuget push $packages[0].FullName --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json --skip-duplicate
+          if ($LASTEXITCODE -ne 0) { throw 'NuGet publication failed.' }
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $assets = @(Get-ChildItem artifacts -File | Select-Object -ExpandProperty FullName)
+          $arguments = @(
+            'release', 'create', $env:GITHUB_REF_NAME
+            '--verify-tag'
+            '--generate-notes'
+            '--title', "Modern Wakeup $env:RELEASE_VERSION"
+          )
+          if ($env:RELEASE_PRERELEASE -eq 'true') {
+            $arguments += '--prerelease'
+          }
+          $arguments += $assets
+
+          & gh @arguments
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub release publication failed.' }
