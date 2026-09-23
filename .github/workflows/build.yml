@@ -15,10 +15,18 @@ jobs:
       - name: Verify Microsoft-signed driver payload
         shell: pwsh
         run: |
-          Get-ChildItem driver -File | Where-Object Extension -in '.cat', '.inf', '.sys' | ForEach-Object {
+          $driverFiles = @(Get-ChildItem driver -File | Where-Object {
+            $_.Extension -in @('.cat', '.inf', '.sys')
+          })
+
+          if ($driverFiles.Count -ne 3) {
+            throw "Expected the signed CAT, INF, and SYS files; found $($driverFiles.Count)."
+          }
+
+          $driverFiles | ForEach-Object {
             $signature = Get-AuthenticodeSignature -LiteralPath $_.FullName
             if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Windows Hardware Compatibility Publisher') {
-              throw "Invalid Hardware Dashboard signature: $($_.Name)"
+              throw "Invalid Hardware Dashboard signature: $($_.Name) ($($signature.Status): $($signature.StatusMessage))"
             }
           }
       - run: dotnet build ModernWakeup.sln -c Release -m:1

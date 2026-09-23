@@ -1,0 +1,4 @@
+# Catalog validation depends on the exact checked-out driver-package bytes.
+/driver/*.cat binary
+/driver/*.inf text eol=crlf
+/driver/*.sys binary
