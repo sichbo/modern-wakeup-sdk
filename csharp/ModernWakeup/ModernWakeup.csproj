@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <AssemblyName>ModernWakeup</AssemblyName>
+    <RootNamespace>ModernWakeup</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <PackageId>ModernWakeup</PackageId>
+    <Version>0.13.0</Version>
+    <Authors>Simon Bond</Authors>
+    <Company>Sichbo Interactive</Company>
+    <Description>Windows Modern Standby compatibility SDK for traditional SetWaitableTimer and SetWaitableTimerEx wake timers.</Description>
+    <PackageTags>windows;modern-standby;wake-timer;setwaitabletimer;driver</PackageTags>
+    <PackageProjectUrl>https://github.com/sichbo/modern-wakeup-sdk</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/sichbo/modern-wakeup-sdk</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseFile>PACKAGE-LICENSE.md</PackageLicenseFile>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="../../Driver/ModernWakeup.Driver.inf" LogicalName="ModernWakeup.Driver.ModernWakeup.Driver.inf" />
+    <EmbeddedResource Include="../../Driver/ModernWakeup.Driver.sys" LogicalName="ModernWakeup.Driver.ModernWakeup.Driver.sys" />
+    <EmbeddedResource Include="../../Driver/modernwakeup.driver.cat" LogicalName="ModernWakeup.Driver.modernwakeup.driver.cat" />
+    <None Include="../../README.md" Pack="true" PackagePath="/" Link="README.md" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="/" Link="LICENSE" />
+    <None Include="../../DRIVER-LICENSE.md" Pack="true" PackagePath="/" Link="DRIVER-LICENSE.md" />
+    <None Include="../../PACKAGE-LICENSE.md" Pack="true" PackagePath="/" Link="PACKAGE-LICENSE.md" />
+  </ItemGroup>
+
+  <Target Name="VerifyDriverPayload" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)/../../Driver/ModernWakeup.Driver.inf')" Text="The signed ModernWakeup driver INF is missing." />
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)/../../Driver/ModernWakeup.Driver.sys')" Text="The signed ModernWakeup driver binary is missing." />
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)/../../Driver/modernwakeup.driver.cat')" Text="The signed ModernWakeup driver catalog is missing." />
+  </Target>
+</Project>

@@ -1,0 +1,4 @@
+2ff6630782e984474dc7317c9bee6a905928bac3753171b441c1f15877f92347  modernwakeup.driver.cat
+386c340c9c32a6e0d58bd9ab4c89fed5ca153ba763bec5bcd550399c077c9c99  ModernWakeup.Driver.inf
+e9e6cd24f6b12aa4213f0a7d13924bc4d42f1028aaafa487f2044ecfd5d4e4b3  ModernWakeup.Driver.sys
+

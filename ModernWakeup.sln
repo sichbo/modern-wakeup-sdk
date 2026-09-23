@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModernWakeup", "csharp\ModernWakeup\ModernWakeup.csproj", "{A40E877D-9EA4-4D81-983D-6CC1967A1865}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModernWakeup.Example", "csharp\Example\ModernWakeup.Example.csproj", "{7347E411-FA37-48DE-B846-2DE2A556B068}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{A40E877D-9EA4-4D81-983D-6CC1967A1865}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A40E877D-9EA4-4D81-983D-6CC1967A1865}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A40E877D-9EA4-4D81-983D-6CC1967A1865}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A40E877D-9EA4-4D81-983D-6CC1967A1865}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7347E411-FA37-48DE-B846-2DE2A556B068}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7347E411-FA37-48DE-B846-2DE2A556B068}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7347E411-FA37-48DE-B846-2DE2A556B068}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7347E411-FA37-48DE-B846-2DE2A556B068}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

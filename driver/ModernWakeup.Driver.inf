@@ -1,0 +1,62 @@
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = System
+ClassGuid   = {4d36e97d-e325-11ce-bfc1-08002be10318}
+Provider    = %ProviderName%
+DriverVer = 09/17/2026,20.2.58.491
+CatalogFile = ModernWakeup.Driver.cat
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+[Manufacturer]
+%ProviderName% = ModernWakeupModels,NTamd64
+
+[ModernWakeupModels.NTamd64]
+%DeviceName% = ModernWakeupDevice,ROOT\ModernWakeup
+
+[ModernWakeupDevice.NT]
+CopyFiles = DriverCopyFiles
+
+[ModernWakeupDevice.NT.Services]
+AddService = ModernWakeup,0x00000002,ServiceInstall,EventLogInstall
+
+[ModernWakeupDevice.NT.Wdf]
+KmdfService = ModernWakeup,ModernWakeupWdf
+
+[ModernWakeupWdf]
+KmdfLibraryVersion = 1.15
+
+[DriverCopyFiles]
+ModernWakeup.Driver.sys
+
+[ServiceInstall]
+DisplayName   = %ServiceName%
+Description   = %ServiceDescription%
+ServiceType   = 1
+; PnP starts the driver when the persistent root-enumerated device is present.
+StartType     = 3
+ErrorControl  = 1
+ServiceBinary = %12%\ModernWakeup.Driver.sys
+
+[EventLogInstall]
+AddReg = EventLogAddReg
+
+[EventLogAddReg]
+HKR,,EventMessageFile,0x00020000,"%%SystemRoot%%\System32\IoLogMsg.dll;%%SystemRoot%%\System32\drivers\ModernWakeup.Driver.sys"
+HKR,,TypesSupported,0x00010001,7
+
+[SourceDisksNames]
+1 = %DiskName%,,,
+
+[SourceDisksFiles]
+ModernWakeup.Driver.sys = 1
+
+[Strings]
+ProviderName       = "Sichbo Interactive"
+DeviceName         = "Modern Wakeup"
+ServiceName        = "Modern Wakeup Power Event Control Driver"
+ServiceDescription = "Bridges allowlisted legacy wake timers to Modern Standby."
+DiskName           = "Modern Wakeup Driver Installation Media"
+

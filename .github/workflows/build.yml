@@ -1,0 +1,34 @@
+name: build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Verify Microsoft-signed driver payload
+        shell: pwsh
+        run: |
+          Get-ChildItem driver -File | Where-Object Extension -in '.cat', '.inf', '.sys' | ForEach-Object {
+            $signature = Get-AuthenticodeSignature -LiteralPath $_.FullName
+            if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Windows Hardware Compatibility Publisher') {
+              throw "Invalid Hardware Dashboard signature: $($_.Name)"
+            }
+          }
+      - run: dotnet build ModernWakeup.sln -c Release -m:1
+      - run: dotnet pack csharp/ModernWakeup/ModernWakeup.csproj -c Release --no-build -o artifacts
+      - run: cmake -S cpp -B out/cpp -A x64
+      - run: cmake --build out/cpp --config Release --parallel
+      - uses: actions/upload-artifact@v4
+        with:
+          name: modern-wakeup-sdk
+          path: |
+            artifacts/*.nupkg
+            out/cpp/Release/*.lib
+            out/cpp/Release/*.exe
